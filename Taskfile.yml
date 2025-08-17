@@ -3,6 +3,24 @@
 version: "3"
 
 tasks:
+  build:
+    env:
+      CGO_ENABLED: 0
+    vars:
+      VERSION: '{{ .VERSION | default "local" }}'
+      GIT_COMMIT: '{{ .GIT_COMMIT | default "v0.0.0" }}'
+      BUILD_OUTPUT: '{{ .BUILD_OUTPUT | default "./bin/server" }}'
+      LDFLAGS: |
+        -X main.version={{.VERSION}}
+        -X main.Commit={{.GIT_COMMIT}}
+    cmd: go build -o {{.BUILD_OUTPUT}} -ldflags "{{.LDFLAGS}}" ./cmd/server
+
+  apply:
+    cmds:
+      - task: kubectl
+        vars:
+          CLI_ARGS: apply
+
   kubectl:
     dir: deployment/
     cmd: kubectl {{.CLI_ARGS}} -f .
