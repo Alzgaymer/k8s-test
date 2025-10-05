@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: x-backend
+  labels:
+    app: backend-config
+data:
+  DB: "db..."
+  OTEL_EXPORTER_OTLP_ENDPOINT: alloy.observability.svc.cluster.local:4317

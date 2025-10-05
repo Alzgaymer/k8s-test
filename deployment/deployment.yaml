@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: x-backend
+  namespace: x-backend
+  labels:
+    tier: backend
+    app: x
+
+spec:
+  selector:
+    matchLabels:
+      app: x
+      tier: backend
+
+  template:
+    metadata:
+      name: x-backend
+      namespace: x-backend
+      annotations:
+        github: https://github.com/Alzgaymer/k8s-test
+      labels:
+        tier: backend
+        app: x
+    spec:
+      containers:
+        - name: backend
+          image: viacheslavzalitskyi/k8s-test:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+            - name: OTEL_SERVICE_NAME
+              value: "x-backend"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment=development,service.namespace=x-backend"
+          envFrom:
+            - configMapRef:
+                name: backend-config
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

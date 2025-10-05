@@ -1,0 +1,62 @@
+tempo:
+  # Storage configuration
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+
+  # Retention
+  retention: 720h # 30 days
+
+  # Ingestion limits
+  ingestion:
+    rate_limit_bytes: 15000000 # 15MB/s
+    burst_size_bytes: 20000000 # 20MB
+
+  # Compaction
+  compaction:
+    block_retention: 720h # 30 days
+
+# Use single binary for minimal setup
+mode: monolithic
+
+# Persistence
+persistence:
+  enabled: true
+  size: 50Gi
+  storageClass: "" # Use default storage class
+
+# Resources
+resources:
+  limits:
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Replicas
+replicas: 1
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# Traces ingestion
+traces:
+  otlp:
+    grpc:
+      enabled: true
+      endpoint: 0.0.0.0:4317
+    http:
+      enabled: true
+      endpoint: 0.0.0.0:4318
+
+# Search configuration
+search:
+  enabled: true
+
+# Metrics generator (creates metrics from traces)
+metricsGenerator:
+  enabled: true
+  remoteWriteUrl: http://prometheus-server.observability.svc.cluster.local/api/v1/write

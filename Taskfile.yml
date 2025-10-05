@@ -16,11 +16,37 @@ tasks:
     cmd: go build -o {{.BUILD_OUTPUT}} -ldflags "{{.LDFLAGS}}" ./cmd/server
 
   apply:
-    cmds:
-      - task: kubectl
-        vars:
-          CLI_ARGS: apply
-
-  kubectl:
     dir: deployment/
-    cmd: kubectl {{.CLI_ARGS}} -f .
+    vars:
+      LGTM: "alloy,tempo,grafana,loki"
+    cmds:
+      - kubectl apply -f namespace.yaml --wait=true
+      - kubectl apply -f . --wait=true
+      - |
+        echo "📦 Updating Helm repositories..."
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo update
+      - |
+        echo "🔄 Deploying Prometheus..."
+        helm upgrade --install prometheus prometheus-community/prometheus \
+          --namespace observability \
+          --values lgtm/prometheus/values.yaml \
+          --wait --timeout=5m
+
+      - for:
+          var: LGTM
+          split: ","
+          as: ITEM
+        cmd: |
+          echo "{{.LGTM}}" | tr ',' '\n' | parallel -j 4 '
+            echo "🔄 Deploying LGTM observability stack...Initializing {}..."
+            helm upgrade --install {} grafana/{} \
+              --namespace observability \
+              --values lgtm/{}/values.yaml
+          '
+  reset:
+    cmds:
+      - minikube delete
+      - minikube start
+      - task: apply
