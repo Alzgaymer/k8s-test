@@ -34,11 +34,7 @@ tasks:
           --values lgtm/prometheus/values.yaml \
           --wait --timeout=5m
 
-      - for:
-          var: LGTM
-          split: ","
-          as: ITEM
-        cmd: |
+      - cmd: |
           echo "{{.LGTM}}" | tr ',' '\n' | parallel -j 4 '
             echo "🔄 Deploying LGTM observability stack...Initializing {}..."
             helm upgrade --install {} grafana/{} \
