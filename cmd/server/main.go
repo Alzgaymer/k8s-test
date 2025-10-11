@@ -11,6 +11,10 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -38,7 +42,7 @@ func main() {
 
 	ongoingCtx, stopOngoingGracefully := context.WithCancel(context.Background())
 
-	h, unaliveServer := NewRoutes()
+	h, unaliveServer, cleanup := NewRoutes(ongoingCtx)
 	s := NewServer(ongoingCtx, os.Getenv("HOST"), os.Getenv("PORT"), h)
 
 	go func() {
@@ -70,16 +74,32 @@ func main() {
 	}
 
 	slog.Info("Server shut down gracefully")
+
+	slog.Info("Cleaning up dependencies...")
+	cleanup(shutdownCtx)
 }
 
-func NewRoutes() (http.Handler, func()) {
+func NewRoutes(ctx context.Context) (handler http.Handler, unaliceServer func(), cleanup func(context.Context)) {
+	cleanupTracer := newTracer(ctx)
+	tp := otel.GetTracerProvider()
 	mux := http.NewServeMux()
 
-	rh := NewReadinessHandler()
+	rh := NewReadinessHandler(tp.Tracer("http.handler.readiness"))
 
 	mux.Handle("GET /health", rh)
 
-	return mux, rh.MakeUnavailable
+	return mux, rh.MakeUnavailable, func(ctx context.Context) {
+		logError := func(msg string, err error) {
+			status := " succeeded"
+			if err != nil {
+				status = " failed"
+			}
+			slog.Error(msg+status, "err", err)
+		}
+
+		err := cleanupTracer(ctx)
+		logError("cleanup tracer", err)
+	}
 }
 
 func NewServer(embedCtx context.Context, host, port string, handler http.Handler) *http.Server {
@@ -94,13 +114,15 @@ func NewServer(embedCtx context.Context, host, port string, handler http.Handler
 
 type ReadinessHandler struct {
 	available *atomic.Bool
+	trace     trace.Tracer
 }
 
-func NewReadinessHandler() *ReadinessHandler {
+func NewReadinessHandler(trace trace.Tracer) *ReadinessHandler {
 	available := atomic.Bool{}
 	available.Store(true)
 	return &ReadinessHandler{
 		available: &available,
+		trace:     trace,
 	}
 }
 
@@ -109,10 +131,20 @@ func (r *ReadinessHandler) MakeUnavailable() {
 }
 
 func (r *ReadinessHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+	ua := req.UserAgent()
+
+	_, span := r.trace.Start(ctx, "healthcheck", trace.WithAttributes(
+		semconv.UserAgentName(ua),
+	))
+	defer span.End()
+
 	switch r.available.Load() {
 	case true:
+		span.AddEvent("healthy")
 		http.Error(w, "OK", http.StatusOK)
 	case false:
+		span.AddEvent("unhealthy")
 		http.Error(w, "Shutting down", http.StatusServiceUnavailable)
 	}
 }
