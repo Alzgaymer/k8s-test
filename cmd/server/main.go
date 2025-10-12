@@ -88,6 +88,8 @@ func NewRoutes(ctx context.Context) (handler http.Handler, unaliceServer func(),
 
 	mux.Handle("GET /health", rh)
 
+	go produceTraces(ctx, tp.Tracer("dummy-trace-generator"))
+
 	return mux, rh.MakeUnavailable, func(ctx context.Context) {
 		logError := func(msg string, err error) {
 			status := " succeeded"
@@ -146,5 +148,60 @@ func (r *ReadinessHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case false:
 		span.AddEvent("unhealthy")
 		http.Error(w, "Shutting down", http.StatusServiceUnavailable)
+	}
+}
+
+func produceTraces(ctx context.Context, tracer trace.Tracer) {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// Create a root span for a dummy operation
+			ctx, span := tracer.Start(ctx, "dummy.operation")
+
+			// Simulate some work with nested spans
+			func() {
+				_, childSpan := tracer.Start(ctx, "dummy.fetch_data",
+					trace.WithAttributes(
+						semconv.HTTPRequestMethodGet,
+						semconv.HTTPResponseStatusCode(200),
+					),
+				)
+				defer childSpan.End()
+
+				childSpan.AddEvent("fetching data from database")
+				time.Sleep(100 * time.Millisecond)
+			}()
+
+			func() {
+				_, childSpan := tracer.Start(ctx, "dummy.process_data")
+				defer childSpan.End()
+
+				childSpan.AddEvent("processing data")
+				time.Sleep(50 * time.Millisecond)
+			}()
+
+			func() {
+				_, childSpan := tracer.Start(ctx, "dummy.save_result",
+					trace.WithAttributes(
+						semconv.DBSystemNamePostgreSQL,
+						semconv.DBOperationName("insert"),
+					),
+				)
+				defer childSpan.End()
+
+				childSpan.AddEvent("saving result to database")
+				time.Sleep(75 * time.Millisecond)
+			}()
+
+			span.AddEvent("operation completed successfully")
+			span.End()
+
+			slog.Info("Generated dummy trace")
+		}
 	}
 }

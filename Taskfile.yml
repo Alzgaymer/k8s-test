@@ -41,8 +41,12 @@ tasks:
               --namespace observability \
               --values lgtm/{}/values.yaml
           '
+  start:
+    cmds:
+      - minikube start
+      - task: apply
+
   reset:
     cmds:
       - minikube delete
-      - minikube start
-      - task: apply
+      - task: start
