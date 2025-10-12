@@ -53,7 +53,7 @@ datasources:
       - name: Tempo
         type: tempo
         access: proxy
-        url: http://tempo.observability.svc.cluster.local:3100
+        url: http://tempo.observability.svc.cluster.local
         editable: true
         jsonData:
           tracesToLogsV2:

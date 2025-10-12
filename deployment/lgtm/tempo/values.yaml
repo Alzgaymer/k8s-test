@@ -1,4 +1,11 @@
 tempo:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
   # Storage configuration
   storage:
     trace:
@@ -14,6 +21,30 @@ tempo:
     rate_limit_bytes: 15000000 # 15MB/s
     burst_size_bytes: 20000000 # 20MB
 
+server:
+  livenessProbe:
+    httpGet:
+      path: /ready
+      port: 3200
+    initialDelaySeconds: 60 # Increase from 30s
+    periodSeconds: 20 # Check less frequently
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 3200
+    initialDelaySeconds: 30 # Increase from 20s
+    periodSeconds: 10
+    failureThreshold: 3
+  startupProbe:
+    httpGet:
+      path: /ready
+      port: 3200
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 18 # 90 seconds total (18 * 5s)
+
   # Compaction
   compaction:
     block_retention: 720h # 30 days
@@ -21,11 +52,12 @@ tempo:
 # Use single binary for minimal setup
 mode: monolithic
 
-# Persistence
+# Let Helm create the PVC
 persistence:
   enabled: true
   size: 50Gi
-  storageClass: "" # Use default storage class
+  # Remove storageClass or set to your preferred class
+  # storageClass: "fast-ssd"  # Uncomment if you want fast-ssd
 
 # Resources
 resources:
@@ -38,25 +70,15 @@ resources:
 # Replicas
 replicas: 1
 
-# Service configuration
+# Service configuration - Let Helm handle this
 service:
   type: ClusterIP
-
-# Traces ingestion
-traces:
-  otlp:
-    grpc:
-      enabled: true
-      endpoint: 0.0.0.0:4317
-    http:
-      enabled: true
-      endpoint: 0.0.0.0:4318
 
 # Search configuration
 search:
   enabled: true
 
-# Metrics generator (creates metrics from traces)
+# Metrics generator
 metricsGenerator:
   enabled: true
   remoteWriteUrl: http://prometheus-server.observability.svc.cluster.local/api/v1/write
