@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
@@ -26,9 +26,9 @@ func newTracer(ctx context.Context) (cleanup func(context.Context) error) {
 		panic(err)
 	}
 
-	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithInsecure(), // Use WithTLSCredentials in production
-	)
+	otel.SetErrorHandler(&SlogErrorHandler{slog.Default()})
+
+	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithInsecure())
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
@@ -42,4 +42,12 @@ func newTracer(ctx context.Context) (cleanup func(context.Context) error) {
 	slog.InfoContext(ctx, "otel tracer is configured")
 
 	return tp.Shutdown
+}
+
+type SlogErrorHandler struct {
+	log *slog.Logger
+}
+
+func (s *SlogErrorHandler) Handle(err error) {
+	s.log.Error("Error in otel instrumentation", "err", err)
 }

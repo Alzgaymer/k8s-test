@@ -88,7 +88,14 @@ func NewRoutes(ctx context.Context) (handler http.Handler, unaliceServer func(),
 
 	mux.Handle("GET /health", rh)
 
-	go produceTraces(ctx, tp.Tracer("dummy-trace-generator"))
+	for i := range 10 {
+		go func() {
+			slog.Info("Starting producer", slog.Int("i", i))
+			defer slog.Info("Shutdown producer", slog.Int("i", i))
+
+			produceTraces(ctx, tp.Tracer("dummy-trace-generator"))
+		}()
+	}
 
 	return mux, rh.MakeUnavailable, func(ctx context.Context) {
 		logError := func(msg string, err error) {
