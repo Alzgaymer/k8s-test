@@ -1,84 +1,28 @@
-tempo:
-  receivers:
-    otlp:
-      protocols:
-        grpc:
-          endpoint: 0.0.0.0:4317
-        http:
-          endpoint: 0.0.0.0:4318
-  # Storage configuration
-  storage:
-    trace:
-      backend: local
-      local:
-        path: /var/tempo/traces
-
-  # Retention
-  retention: 720h # 30 days
-
-  # Ingestion limits
-  ingestion:
-    rate_limit_bytes: 15000000 # 15MB/s
-    burst_size_bytes: 20000000 # 20MB
-
-server:
-  livenessProbe:
-    httpGet:
-      path: /ready
-      port: 3200
-    initialDelaySeconds: 60 # Increase from 30s
-    periodSeconds: 20 # Check less frequently
-    failureThreshold: 3
-
-  readinessProbe:
-    httpGet:
-      path: /ready
-      port: 3200
-    initialDelaySeconds: 30 # Increase from 20s
-    periodSeconds: 10
-    failureThreshold: 3
-  startupProbe:
-    httpGet:
-      path: /ready
-      port: 3200
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    failureThreshold: 18 # 90 seconds total (18 * 5s)
-
-  # Compaction
-  compaction:
-    block_retention: 720h # 30 days
-
-# Use single binary for minimal setup
-mode: monolithic
-
-# Let Helm create the PVC
-persistence:
+---
+global:
+  clusterDomain: "cluster.local"
+gateway:
   enabled: true
-  size: 50Gi
-  # Remove storageClass or set to your preferred class
-  # storageClass: "fast-ssd"  # Uncomment if you want fast-ssd
-
-# Resources
-resources:
-  limits:
-    memory: 2Gi
-  requests:
-    cpu: 500m
-    memory: 1Gi
-
-# Replicas
-replicas: 1
-
-# Service configuration - Let Helm handle this
-service:
-  type: ClusterIP
-
-# Search configuration
-search:
+minio:
   enabled: true
-
-# Metrics generator
-metricsGenerator:
-  enabled: true
-  remoteWriteUrl: http://prometheus-server.observability.svc.cluster.local/api/v1/write
+storage:
+  trace:
+    backend: s3
+    s3:
+      access_key: "grafana-tempo"
+      secret_key: "supersecret"
+      bucket: "tempo-traces"
+      endpoint: "tempo-minio:9000"
+      insecure: true
+traces:
+  otlp:
+    http:
+      enabled: true
+    grpc:
+      enabled: true
+distributor:
+  config:
+    log_received_spans:
+      enabled: true
+    log_discarded_spans:
+      enabled: true

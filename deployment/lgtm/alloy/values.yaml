@@ -2,6 +2,17 @@ alloy:
   # Run as DaemonSet to collect from all nodes
   mode: daemonset
 
+  extraPorts:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    # OTLP HTTP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+
   # Stability level
   stabilityLevel: "generally-available"
 
@@ -17,126 +28,32 @@ alloy:
   configMap:
     create: true
     content: |-
-      // Logs collection from Kubernetes
-      discovery.kubernetes "pods" {
-        role = "pod"
-      }
-
-      discovery.relabel "pods" {
-        targets = discovery.kubernetes.pods.targets
-
-        // Only collect from pods with logging enabled
-        rule {
-          source_labels = ["__meta_kubernetes_pod_annotation_prometheus_io_scrape"]
-          action = "keep"
-          regex = "true"
-        }
-
-        rule {
-          source_labels = ["__meta_kubernetes_pod_container_name"]
-          target_label = "container"
-        }
-
-        rule {
-          source_labels = ["__meta_kubernetes_namespace"]
-          target_label = "namespace"
-        }
-
-        rule {
-          source_labels = ["__meta_kubernetes_pod_name"]
-          target_label = "pod"
-        }
-      }
-
-      loki.source.kubernetes "pods" {
-        targets    = discovery.relabel.pods.output
-        forward_to = [loki.write.local.receiver]
-      }
-
-      loki.write "local" {
-        endpoint {
-          url = "http://loki-gateway.observability.svc.cluster.local/loki/api/v1/push"
-        }
-      }
-
-      // Metrics collection
-      discovery.kubernetes "services" {
-        role = "service"
-      }
-
-      discovery.relabel "services" {
-        targets = discovery.kubernetes.services.targets
-
-        rule {
-          source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_scrape"]
-          action = "keep"
-          regex = "true"
-        }
-
-        rule {
-          source_labels = ["__meta_kubernetes_service_annotation_prometheus_io_path"]
-          action = "replace"
-          target_label = "__metrics_path__"
-          regex = "(.+)"
-        }
-
-        rule {
-          source_labels = ["__address__", "__meta_kubernetes_service_annotation_prometheus_io_port"]
-          action = "replace"
-          target_label = "__address__"
-          regex = "([^:]+)(?::\\d+)?;(\\d+)"
-          replacement = "$1:$2"
-        }
-      }
-
-      prometheus.scrape "services" {
-        targets    = discovery.relabel.services.output
-        forward_to = [prometheus.remote_write.local.receiver]
-      }
-
-      prometheus.remote_write "local" {
-        endpoint {
-          url = "http://prometheus-server.observability.svc.cluster.local/api/v1/write"
-        }
-      }
 
       // Traces collection
       otelcol.receiver.otlp "default" {
-        grpc {
-          endpoint = "0.0.0.0:4317"
-        }
-        http {
-          endpoint = "0.0.0.0:4318"
-        }
+        grpc { }
+        http { }
 
         output {
-          traces  = [otelcol.exporter.otlp.tempo.input]
+          traces  = [otelcol.processor.batch.default.input]
+        }
+      }
+
+      otelcol.processor.batch "default" {
+        output {
+          traces = [otelcol.exporter.otlp.tempo.input]
         }
       }
 
       otelcol.exporter.otlp "tempo" {
         client {
-          endpoint = "tempo-distributor.observability.svc.cluster.local:4317"
+          endpoint = "http://tempo-distributor.observability.svc.cluster.local:4317"
           tls {
             insecure = true
+            insecure_skip_verify = true
           }
         }
       }
-
-# Service configuration for OTLP receivers
-service:
-  type: ClusterIP
-  ports:
-    # OTLP gRPC
-    - name: otlp-grpc
-      port: 4317
-      targetPort: 4317
-      protocol: TCP
-    # OTLP HTTP
-    - name: otlp-http
-      port: 4318
-      targetPort: 4318
-      protocol: TCP
 
 # Security context
 securityContext:

@@ -18,7 +18,7 @@ tasks:
   apply:
     dir: deployment/
     vars:
-      LGTM: "alloy,tempo,grafana,loki"
+      LGTM: "alloy,grafana"
     cmds:
       - kubectl apply -f namespace.yaml --wait=true
       - kubectl apply -f . --wait=true
@@ -33,6 +33,11 @@ tasks:
           --namespace observability \
           --values lgtm/prometheus/values.yaml \
           --wait --timeout=5m
+      - |
+        echo "🔄 Deploying Tempo Distributed..."
+        helm upgrade --install tempo grafana/tempo-distributed \
+          --namespace observability \
+          --values lgtm/tempo/values.yaml
 
       - cmd: |
           echo "{{.LGTM}}" | tr ',' '\n' | parallel -j 4 '
@@ -52,3 +57,15 @@ tasks:
     cmds:
       - minikube delete
       - task: start
+
+  update:
+    dir: deployment/
+    vars:
+      LGTM: "alloy"
+    cmd: |
+      echo "{{.LGTM}}" | tr ',' '\n' | parallel -j 4 '
+            echo "🔄 Updating LGTM observability instances: upgrading {}..."
+            helm upgrade {} grafana/{} \
+              --namespace observability \
+              --values lgtm/{}/values.yaml
+          '

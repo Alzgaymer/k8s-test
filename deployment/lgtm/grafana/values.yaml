@@ -53,19 +53,12 @@ datasources:
       - name: Tempo
         type: tempo
         access: proxy
-        url: http://tempo.observability.svc.cluster.local
-        editable: true
+        url: http://tempo-query-frontend.observability.svc.cluster.local:3200
         jsonData:
-          tracesToLogsV2:
-            datasourceUid: loki
-            filterByTraceID: true
-            filterBySpanID: false
-          tracesToMetrics:
-            datasourceUid: prometheus
-          serviceMap:
-            datasourceUid: prometheus
-          nodeGraph:
-            enabled: true
+          httpMethod: GET
+        editable: false
+        basicAuth: false
+        apiVersion: 1
 
 # Dashboard providers
 dashboardProviders:
