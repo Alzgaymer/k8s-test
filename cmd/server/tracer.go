@@ -29,11 +29,14 @@ func newTracer(ctx context.Context) (cleanup func(context.Context) error) {
 	otel.SetErrorHandler(&SlogErrorHandler{slog.Default()})
 
 	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithInsecure())
+	if err != nil {
+		panic(err)
+	}
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.NeverSample()),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
 	// Set as global tracer provider
