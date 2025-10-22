@@ -13,9 +13,12 @@ WORKDIR /src
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=bind,source=go.mod,target=go.mod \
+    --mount=type=bind,source=go.sum,target=go.sum \
     go mod download -x
 
-RUN go install github.com/go-task/task/v3/cmd/task@latest
+RUN --mount=type=cache,target=/go/pkg/mod/ \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install github.com/go-task/task/v3/cmd/task@v3.40.1
 
 ARG VERSION
 ARG GIT_COMMIT
@@ -26,6 +29,7 @@ ENV GOARCH=$TARGETARCH
 ENV CGO_ENABLED=0
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
+    --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=bind,target=. \
     BUILD_OUTPUT=/bin/server VERSION=${VERSION} GIT_COMMIT=${GIT_COMMIT} task build
 
