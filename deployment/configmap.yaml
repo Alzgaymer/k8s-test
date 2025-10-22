@@ -7,4 +7,4 @@ metadata:
     app: backend-config
 data:
   DB: "db..."
-  OTEL_EXPORTER_OTLP_ENDPOINT: alloy.observability.svc.cluster.local:4318
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy.observability.svc.cluster.local:4318
