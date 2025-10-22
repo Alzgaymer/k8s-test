@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
     --mount=type=cache,target=/root/.cache/go-build \
-    go install github.com/go-task/task/v3/cmd/task@v3.40.1
+    go install github.com/go-task/task/v3/cmd/task@v3.45.4
 
 ARG VERSION
 ARG GIT_COMMIT
